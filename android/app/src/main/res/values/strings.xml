@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Cognitive Care Assistant</string>
+    <string name="title_activity_main">Cognitive Care Assistant</string>
+    <string name="package_name">com.cognitivecare.assistant</string>
+    <string name="custom_url_scheme">com.cognitivecare.assistant</string>
+</resources>
