@@ -1,8 +1,4 @@
 :root {
-  /* =========================================================
-     DEFAULT LIGHT THEME
-     ========================================================= */
-
   --primary-emerald: #059669;
   --primary-emerald-hover: #047857;
   --emerald-accent: #10b981;
@@ -49,7 +45,6 @@
   --radius-xl: 34px;
 }
 
-
 /* =========================================================
    DARK THEME
    ========================================================= */
@@ -80,7 +75,6 @@
   --border-subtle: #334155;
 }
 
-
 /* =========================================================
    COMFORT THEME
    ========================================================= */
@@ -101,7 +95,6 @@
   --text-muted: #92400e;
   --border-subtle: #fed7aa;
 }
-
 
 /* =========================================================
    FOREST THEME
@@ -124,7 +117,6 @@
   --border-subtle: #bbf7d0;
 }
 
-
 /* =========================================================
    AZURE THEME
    ========================================================= */
@@ -146,9 +138,8 @@
   --border-subtle: #bae6fd;
 }
 
-
 /* =========================================================
-   FONT SCALING
+   FONT SCALE
    ========================================================= */
 
 [data-font-scale="normal"] {
@@ -163,9 +154,8 @@
   font-size: 20px;
 }
 
-
 /* =========================================================
-   GLOBAL RESET
+   RESET
    ========================================================= */
 
 * {
@@ -178,13 +168,13 @@
 html {
   width: 100%;
   min-height: 100%;
+
   font-size: 16px;
 
-  /* IMPORTANT FOR ANDROID WEBVIEW */
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
 
-  scroll-behavior: smooth;
+  overflow-x: hidden;
 }
 
 body {
@@ -193,7 +183,8 @@ body {
 
   font-family: var(--font-family-base);
   font-size: var(--font-base-size);
-  background-color: var(--bg-parchment);
+
+  background: var(--bg-parchment);
   color: var(--text-primary);
 
   line-height: 1.5;
@@ -220,24 +211,23 @@ select {
 
 img {
   max-width: 100%;
+  height: auto;
   display: block;
 }
 
-
 /* =========================================================
-   MAIN CONTAINER
+   CONTAINER
    ========================================================= */
 
 .kiosk-container {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: var(--bg-parchment);
+  background: var(--bg-parchment);
 }
 
-
 /* =========================================================
-   HEADER / NAVIGATION
+   NAVIGATION
    ========================================================= */
 
 .kiosk-nav {
@@ -268,11 +258,15 @@ img {
 
   text-decoration: none;
   cursor: pointer;
+
+  min-width: 0;
 }
 
 .brand-logo-icon {
   width: 50px;
   height: 50px;
+
+  flex-shrink: 0;
 
   background: linear-gradient(
     135deg,
@@ -290,8 +284,6 @@ img {
   color: white;
 
   box-shadow: var(--shadow-glow);
-
-  flex-shrink: 0;
 }
 
 .brand-title {
@@ -317,7 +309,6 @@ img {
   flex-wrap: wrap;
 }
 
-
 /* =========================================================
    OFFLINE BADGE
    ========================================================= */
@@ -327,7 +318,7 @@ img {
   align-items: center;
   gap: 6px;
 
-  background-color: var(--emerald-surface);
+  background: var(--emerald-surface);
   color: var(--primary-emerald);
 
   border: 1px solid var(--emerald-border);
@@ -338,13 +329,17 @@ img {
 
   font-size: 0.85rem;
   font-weight: 800;
+
+  white-space: nowrap;
 }
 
 .pulse-dot {
   width: 10px;
   height: 10px;
 
-  background-color: var(--emerald-accent);
+  flex-shrink: 0;
+
+  background: var(--emerald-accent);
 
   border-radius: 50%;
 
@@ -368,7 +363,6 @@ img {
   }
 }
 
-
 /* =========================================================
    HEADER BUTTONS
    ========================================================= */
@@ -377,6 +371,8 @@ img {
 .btn-mode-switch {
   display: flex;
   align-items: center;
+  justify-content: center;
+
   gap: 8px;
 
   padding: 10px 16px;
@@ -409,25 +405,23 @@ img {
   color: var(--muga-gold);
 }
 
-
 /* =========================================================
-   MAIN CONTENT
+   MAIN
    ========================================================= */
 
 .kiosk-main {
   flex: 1;
 
-  max-width: 1240px;
   width: 100%;
+  max-width: 1240px;
 
   margin: 0 auto;
 
   padding: 24px 20px 60px;
 }
 
-
 /* =========================================================
-   PATIENT HERO
+   HERO
    ========================================================= */
 
 .patient-hero-banner {
@@ -482,7 +476,6 @@ img {
   z-index: 2;
 }
 
-
 /* =========================================================
    LARGE ACTION BUTTONS
    ========================================================= */
@@ -491,6 +484,8 @@ img {
 .btn-large-sos {
   display: flex;
   align-items: center;
+  justify-content: center;
+
   gap: 10px;
 
   border: none;
@@ -525,9 +520,8 @@ img {
     0 4px 14px rgba(239, 68, 68, 0.4);
 }
 
-
 /* =========================================================
-   ROUTINE SECTION
+   ROUTINE
    ========================================================= */
 
 .routine-section {
@@ -560,6 +554,7 @@ img {
 
   display: flex;
   align-items: center;
+
   gap: 12px;
 }
 
@@ -583,6 +578,7 @@ img {
 
   display: flex;
   flex-direction: column;
+
   justify-content: space-between;
 
   min-height: 140px;
@@ -662,9 +658,8 @@ img {
   border-color: var(--emerald-accent);
 }
 
-
 /* =========================================================
-   COGNITIVE GAMES
+   GAMES
    ========================================================= */
 
 .games-grid {
@@ -693,6 +688,7 @@ img {
 
   display: flex;
   flex-direction: column;
+
   justify-content: space-between;
 
   min-height: 290px;
@@ -722,6 +718,8 @@ img {
   justify-content: center;
 
   margin-bottom: 18px;
+
+  flex-shrink: 0;
 }
 
 .icon-emerald {
@@ -779,6 +777,7 @@ img {
 
 .btn-game-play {
   min-height: 58px;
+
   width: 100%;
 
   border-radius: var(--radius-lg);
@@ -819,7 +818,6 @@ img {
   background: linear-gradient(135deg, #7c3aed, #6d28d9);
 }
 
-
 /* =========================================================
    GAME ARENA
    ========================================================= */
@@ -842,6 +840,7 @@ img {
 
 .game-arena-header {
   display: flex;
+
   justify-content: space-between;
   align-items: center;
 
@@ -882,7 +881,9 @@ img {
 
 .game-status-pills {
   display: flex;
+
   gap: 10px;
+
   flex-wrap: wrap;
 }
 
@@ -911,14 +912,15 @@ img {
   color: var(--primary-emerald);
 }
 
-
 /* =========================================================
-   PHOTO REMINISCENCE
+   PHOTO GAME
    ========================================================= */
 
 .reminiscence-photo-stage {
   display: flex;
+
   flex-direction: column;
+
   align-items: center;
 
   gap: 22px;
@@ -928,6 +930,7 @@ img {
   position: relative;
 
   width: 100%;
+
   max-width: 520px;
 
   height: 330px;
@@ -964,6 +967,7 @@ img {
   gap: 14px;
 
   width: 100%;
+
   max-width: 520px;
 }
 
@@ -976,10 +980,13 @@ img {
   border-radius: var(--radius-md);
 
   font-size: 1rem;
+
   font-weight: 800;
 
   display: flex;
+
   align-items: center;
+
   justify-content: center;
 
   gap: 10px;
@@ -1003,7 +1010,6 @@ img {
   color: var(--brahmaputra-blue);
 }
 
-
 /* =========================================================
    CHOICE OPTIONS
    ========================================================= */
@@ -1011,11 +1017,13 @@ img {
 .options-choice-grid {
   display: grid;
 
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
 
   gap: 16px;
 
   width: 100%;
+
   max-width: 640px;
 }
 
@@ -1033,6 +1041,7 @@ img {
   color: var(--text-primary);
 
   font-size: 1.15rem;
+
   font-weight: 800;
 
   cursor: pointer;
@@ -1040,9 +1049,11 @@ img {
   transition: all 0.2s ease;
 
   display: flex;
+
   flex-direction: column;
 
   align-items: center;
+
   justify-content: center;
 
   text-align: center;
@@ -1070,13 +1081,13 @@ img {
   color: #991b1b;
 }
 
-
 /* =========================================================
-   RHYTHM GAME
+   RHYTHM
    ========================================================= */
 
 .rhythm-stage {
   display: flex;
+
   flex-direction: column;
 
   align-items: center;
@@ -1093,6 +1104,7 @@ img {
   display: flex;
 
   align-items: center;
+
   justify-content: center;
 }
 
@@ -1132,6 +1144,7 @@ img {
   flex-direction: column;
 
   align-items: center;
+
   justify-content: center;
 
   color: white;
@@ -1155,7 +1168,6 @@ img {
   text-align: center;
 }
 
-
 /* =========================================================
    MODAL
    ========================================================= */
@@ -1172,6 +1184,7 @@ img {
   display: flex;
 
   align-items: center;
+
   justify-content: center;
 
   z-index: 100;
@@ -1221,7 +1234,6 @@ img {
   margin: 18px 0;
 }
 
-
 /* =========================================================
    DASHBOARD
    ========================================================= */
@@ -1256,6 +1268,7 @@ img {
   display: flex;
 
   align-items: center;
+
   justify-content: space-between;
 
   background: var(--emerald-surface);
@@ -1337,7 +1350,6 @@ img {
   margin-top: 8px;
 }
 
-
 /* =========================================================
    TABLET
    ========================================================= */
@@ -1359,18 +1371,13 @@ img {
   }
 }
 
-
 /* =========================================================
-   MOBILE PHONE
+   MOBILE
+   IMPORTANT:
+   Keep phone UI compact.
    ========================================================= */
 
 @media screen and (max-width: 600px) {
-
-  /*
-   * VERY IMPORTANT
-   * Android WebView sometimes enlarges text automatically.
-   * This keeps the webpage at normal CSS size.
-   */
 
   html {
     font-size: 14px !important;
@@ -1395,488 +1402,456 @@ img {
     overflow-x: hidden;
   }
 
-
-  /* -------------------------------------------------------
-     HEADINGS
-     ------------------------------------------------------- */
+  /* ---------- HEADINGS ---------- */
 
   h1 {
-    font-size: 1.8rem !important;
+    font-size: 1.55rem !important;
     line-height: 1.15 !important;
   }
 
   h2 {
-    font-size: 1.45rem !important;
+    font-size: 1.3rem !important;
     line-height: 1.2 !important;
   }
 
   h3 {
-    font-size: 1.2rem !important;
+    font-size: 1.1rem !important;
     line-height: 1.25 !important;
   }
 
   h4 {
-    font-size: 1.05rem !important;
+    font-size: 1rem !important;
   }
 
   p {
-    font-size: 0.9rem !important;
-    line-height: 1.45 !important;
+    font-size: 0.86rem !important;
+    line-height: 1.4 !important;
   }
 
-
-  /* -------------------------------------------------------
-     MAIN
-     ------------------------------------------------------- */
+  /* ---------- MAIN ---------- */
 
   .kiosk-main {
     width: 100%;
-
     max-width: 100%;
 
     padding:
-      12px
-      12px
-      28px !important;
+      10px
+      10px
+      24px !important;
   }
 
-
-  /* -------------------------------------------------------
-     NAVIGATION
-     ------------------------------------------------------- */
+  /* ---------- NAV ---------- */
 
   .kiosk-nav {
-    padding: 8px 12px !important;
+    padding: 7px 10px !important;
 
     gap: 6px;
 
     flex-wrap: nowrap;
+
+    min-height: 52px;
   }
 
   .brand-badge {
-    gap: 8px;
+    gap: 7px;
+
+    min-width: 0;
+
+    flex: 1;
   }
 
   .brand-logo-icon {
-    width: 38px !important;
-    height: 38px !important;
+    width: 34px !important;
+    height: 34px !important;
 
-    border-radius: 11px !important;
+    border-radius: 9px !important;
   }
 
   .brand-title {
-    font-size: 1.1rem !important;
+    font-size: 1rem !important;
+
+    white-space: nowrap;
   }
 
   .brand-sub {
-    font-size: 0.65rem !important;
+    font-size: 0.58rem !important;
+
+    white-space: nowrap;
   }
 
   .nav-actions {
-    gap: 5px;
+    gap: 4px;
+
+    flex-shrink: 0;
   }
 
   .badge-offline {
-    padding: 5px 8px !important;
+    padding: 4px 7px !important;
 
-    font-size: 0.7rem !important;
+    font-size: 0.62rem !important;
   }
 
   .pulse-dot {
-    width: 7px;
-    height: 7px;
+    width: 6px;
+    height: 6px;
   }
 
-
-  /* -------------------------------------------------------
-     HEADER BUTTONS
-     ------------------------------------------------------- */
+  /* ---------- HEADER BUTTONS ---------- */
 
   .btn-lang-toggle,
   .btn-mode-switch {
-    min-height: 38px !important;
+    min-height: 34px !important;
 
     padding:
-      6px
-      9px !important;
+      5px
+      7px !important;
 
-    font-size: 0.75rem !important;
+    font-size: 0.68rem !important;
 
-    border-radius: 12px !important;
+    border-radius: 9px !important;
+
+    gap: 4px;
+  }
+
+  /* ---------- HERO ---------- */
+
+  .patient-hero-banner {
+    padding: 15px !important;
+
+    margin-bottom: 13px !important;
+
+    border-radius: 16px !important;
+
+    gap: 11px;
+  }
+
+  .patient-greeting-title {
+    font-size: 1.25rem !important;
+
+    line-height: 1.2 !important;
+
+    margin-bottom: 5px;
+  }
+
+  .patient-greeting-sub {
+    font-size: 0.72rem !important;
+  }
+
+  .hero-quick-actions {
+    gap: 6px;
+  }
+
+  /* ---------- HERO BUTTONS ---------- */
+
+  .btn-large-voice-help,
+  .btn-large-sos {
+    min-height: 40px !important;
+
+    padding:
+      7px
+      10px !important;
+
+    font-size: 0.72rem !important;
+
+    border-radius: 11px !important;
 
     gap: 5px;
   }
 
-
-  /* -------------------------------------------------------
-     HERO
-     ------------------------------------------------------- */
-
-  .patient-hero-banner {
-    padding: 18px !important;
-
-    margin-bottom: 16px !important;
-
-    border-radius: 18px !important;
-
-    gap: 14px;
-  }
-
-  .patient-greeting-title {
-    font-size: 1.4rem !important;
-
-    line-height: 1.2 !important;
-  }
-
-  .patient-greeting-sub {
-    font-size: 0.8rem !important;
-  }
-
-  .hero-quick-actions {
-    gap: 8px;
-  }
-
-
-  /* -------------------------------------------------------
-     LARGE BUTTONS
-     ------------------------------------------------------- */
-
-  .btn-large-voice-help,
-  .btn-large-sos {
-    min-height: 46px !important;
-
-    padding:
-      9px
-      13px !important;
-
-    font-size: 0.82rem !important;
-
-    border-radius: 14px !important;
-
-    gap: 6px;
-  }
-
-
-  /* -------------------------------------------------------
-     ROUTINE
-     ------------------------------------------------------- */
+  /* ---------- ROUTINE ---------- */
 
   .routine-section {
-    padding: 16px !important;
+    padding: 13px !important;
 
-    margin-bottom: 18px !important;
+    margin-bottom: 15px !important;
 
-    border-radius: 18px !important;
+    border-radius: 16px !important;
   }
 
   .routine-section-header {
-    margin-bottom: 14px;
+    margin-bottom: 11px;
   }
 
   .section-headline {
-    font-size: 1.2rem !important;
+    font-size: 1.05rem !important;
 
-    gap: 7px;
+    gap: 6px;
   }
 
   .routine-timeline-grid {
     grid-template-columns: 1fr !important;
 
-    gap: 9px !important;
+    gap: 7px !important;
   }
 
   .routine-card {
-    padding: 13px !important;
+    padding: 11px !important;
 
-    min-height: 100px !important;
+    min-height: 86px !important;
 
-    border-radius: 14px !important;
+    border-radius: 12px !important;
   }
 
   .routine-time-badge {
-    font-size: 0.72rem !important;
+    font-size: 0.65rem !important;
+
+    margin-bottom: 3px;
   }
 
   .routine-item-title {
-    font-size: 0.92rem !important;
+    font-size: 0.84rem !important;
+
+    margin-bottom: 3px;
   }
 
   .routine-item-desc {
-    font-size: 0.75rem !important;
+    font-size: 0.68rem !important;
 
-    margin-bottom: 8px;
+    margin-bottom: 6px;
   }
 
   .btn-routine-action {
-    min-height: 40px !important;
+    min-height: 34px !important;
 
-    font-size: 0.78rem !important;
+    font-size: 0.68rem !important;
 
-    border-radius: 11px !important;
+    border-radius: 9px !important;
   }
 
-
-  /* -------------------------------------------------------
-     GAMES
-     ------------------------------------------------------- */
+  /* ---------- GAMES ---------- */
 
   .games-grid {
     grid-template-columns: 1fr !important;
 
-    gap: 12px !important;
+    gap: 9px !important;
 
-    margin-top: 10px;
+    margin-top: 8px;
   }
 
   .game-launch-card {
-    padding: 17px !important;
+    padding: 13px !important;
 
-    min-height: 205px !important;
+    min-height: 175px !important;
 
-    border-radius: 18px !important;
+    border-radius: 15px !important;
 
     border-width: 2px !important;
   }
 
   .game-card-icon-wrapper {
-    width: 50px !important;
-    height: 50px !important;
+    width: 43px !important;
+    height: 43px !important;
 
-    border-radius: 15px !important;
+    border-radius: 12px !important;
 
-    margin-bottom: 10px !important;
+    margin-bottom: 7px !important;
   }
 
   .game-card-title {
-    font-size: 1.12rem !important;
+    font-size: 0.98rem !important;
 
-    margin-bottom: 5px;
+    margin-bottom: 4px;
   }
 
   .game-card-sub {
-    font-size: 0.8rem !important;
+    font-size: 0.7rem !important;
 
-    margin-bottom: 12px !important;
+    margin-bottom: 9px !important;
+
+    line-height: 1.35;
   }
 
   .btn-game-play {
-    min-height: 46px !important;
+    min-height: 39px !important;
 
-    font-size: 0.9rem !important;
+    font-size: 0.76rem !important;
 
-    border-radius: 14px !important;
+    border-radius: 11px !important;
+
+    gap: 7px;
   }
 
-
-  /* -------------------------------------------------------
-     GAME ARENA
-     ------------------------------------------------------- */
+  /* ---------- GAME ARENA ---------- */
 
   .game-arena-container {
-    padding: 17px !important;
+    padding: 13px !important;
 
-    border-radius: 18px !important;
+    border-radius: 16px !important;
 
     border-width: 2px !important;
   }
 
   .game-arena-header {
-    padding-bottom: 13px !important;
+    padding-bottom: 10px !important;
 
-    margin-bottom: 17px !important;
+    margin-bottom: 13px !important;
 
-    gap: 8px;
+    gap: 6px;
   }
 
   .btn-back-kiosk {
-    min-height: 42px !important;
+    min-height: 36px !important;
 
     padding:
-      8px
-      12px !important;
+      6px
+      9px !important;
 
-    font-size: 0.8rem !important;
+    font-size: 0.7rem !important;
 
-    border-radius: 12px !important;
+    border-radius: 9px !important;
   }
 
   .game-status-pills {
-    gap: 6px;
+    gap: 4px;
   }
 
   .status-pill {
     padding:
-      5px
-      9px !important;
+      4px
+      7px !important;
 
-    font-size: 0.72rem !important;
+    font-size: 0.64rem !important;
   }
 
-
-  /* -------------------------------------------------------
-     PHOTO GAME
-     ------------------------------------------------------- */
+  /* ---------- PHOTO GAME ---------- */
 
   .reminiscence-photo-stage {
-    gap: 14px;
+    gap: 10px;
   }
 
   .photo-frame-wrapper {
-    height: 220px !important;
+    height: 190px !important;
 
-    border-radius: 18px !important;
+    border-radius: 15px !important;
 
-    border-width: 3px !important;
+    border-width: 2px !important;
   }
 
   .audio-hint-bar {
-    gap: 7px;
+    gap: 5px;
   }
 
   .btn-audio-hint,
   .btn-reveal-hint {
-    min-height: 44px !important;
+    min-height: 37px !important;
 
-    font-size: 0.78rem !important;
+    font-size: 0.68rem !important;
 
-    border-radius: 12px !important;
+    border-radius: 9px !important;
 
-    gap: 6px;
+    gap: 4px;
   }
 
-
-  /* -------------------------------------------------------
-     CHOICE OPTIONS
-     ------------------------------------------------------- */
+  /* ---------- OPTIONS ---------- */
 
   .options-choice-grid {
     grid-template-columns: 1fr !important;
 
-    gap: 9px !important;
+    gap: 7px !important;
   }
 
   .btn-choice-option {
-    min-height: 56px !important;
+    min-height: 46px !important;
 
     padding:
-      10px
-      12px !important;
+      8px
+      10px !important;
 
-    border-radius: 14px !important;
+    border-radius: 11px !important;
 
     border-width: 2px !important;
 
-    font-size: 0.92rem !important;
+    font-size: 0.78rem !important;
   }
 
-
-  /* -------------------------------------------------------
-     RHYTHM GAME
-     ------------------------------------------------------- */
+  /* ---------- RHYTHM ---------- */
 
   .rhythm-stage {
-    gap: 15px;
+    gap: 11px;
   }
 
   .drum-arena-visual {
-    width: 210px !important;
-    height: 210px !important;
+    width: 175px !important;
+    height: 175px !important;
   }
 
   .rhythm-pulse-ring {
-    width: 190px !important;
-    height: 190px !important;
+    width: 160px !important;
+    height: 160px !important;
   }
 
   .dhol-center-button {
-    width: 135px !important;
-    height: 135px !important;
+    width: 112px !important;
+    height: 112px !important;
 
-    border-width: 6px !important;
+    border-width: 5px !important;
   }
 
   .rhythm-feedback-banner {
-    font-size: 1rem !important;
+    font-size: 0.85rem !important;
+
+    min-height: 28px;
   }
 
-
-  /* -------------------------------------------------------
-     DASHBOARD
-     ------------------------------------------------------- */
+  /* ---------- DASHBOARD ---------- */
 
   .dashboard-grid {
     grid-template-columns: 1fr !important;
 
-    gap: 14px !important;
+    gap: 11px !important;
   }
 
   .dashboard-card {
-    padding: 17px !important;
+    padding: 13px !important;
 
-    border-radius: 18px !important;
+    border-radius: 16px !important;
   }
 
   .csi-gauge-banner {
-    padding: 16px !important;
+    padding: 13px !important;
 
-    border-radius: 14px !important;
+    border-radius: 12px !important;
 
-    margin-bottom: 16px;
+    margin-bottom: 12px;
   }
 
   .csi-big-number {
-    font-size: 2.1rem !important;
+    font-size: 1.8rem !important;
   }
 
   .trend-chart-container {
-    height: 140px;
+    height: 115px;
 
-    gap: 8px;
+    gap: 5px;
   }
 
   .trend-label {
-    font-size: 0.65rem !important;
+    font-size: 0.58rem !important;
   }
 
-
-  /* -------------------------------------------------------
-     MODAL
-     ------------------------------------------------------- */
+  /* ---------- MODAL ---------- */
 
   .pin-modal-overlay {
-    padding: 14px !important;
+    padding: 10px !important;
   }
 
   .pin-modal-box {
-    padding: 20px !important;
+    padding: 16px !important;
 
-    border-radius: 18px !important;
+    border-radius: 15px !important;
   }
 
   .pin-input {
-    padding: 12px !important;
+    padding: 10px !important;
 
-    font-size: 1.25rem !important;
+    font-size: 1.15rem !important;
 
-    letter-spacing: 6px !important;
+    letter-spacing: 5px !important;
 
-    margin: 14px 0;
+    margin: 11px 0;
   }
 
-
-  /* -------------------------------------------------------
-     ALL BUTTONS ON MOBILE
-     ------------------------------------------------------- */
-
-  button {
-    -webkit-text-size-adjust: 100% !important;
-    text-size-adjust: 100% !important;
-  }
-
-
-  /* -------------------------------------------------------
-     INPUTS
-     ------------------------------------------------------- */
+  /* ---------- INPUTS ---------- */
 
   input,
   textarea,
@@ -1886,11 +1861,17 @@ img {
     -webkit-text-size-adjust: 100% !important;
     text-size-adjust: 100% !important;
   }
+
+  /* ---------- BUTTONS ---------- */
+
+  button {
+    -webkit-text-size-adjust: 100% !important;
+    text-size-adjust: 100% !important;
+  }
 }
 
-
 /* =========================================================
-   SMALL PHONE
+   VERY SMALL PHONES
    ========================================================= */
 
 @media screen and (max-width: 380px) {
@@ -1904,32 +1885,40 @@ img {
   }
 
   .kiosk-main {
-    padding-left: 9px !important;
-    padding-right: 9px !important;
+    padding-left: 8px !important;
+    padding-right: 8px !important;
   }
 
   .kiosk-nav {
-    padding-left: 9px !important;
-    padding-right: 9px !important;
+    padding-left: 7px !important;
+    padding-right: 7px !important;
+  }
+
+  .brand-logo-icon {
+    width: 32px !important;
+    height: 32px !important;
+  }
+
+  .brand-title {
+    font-size: 0.92rem !important;
   }
 
   .patient-hero-banner {
-    padding: 15px !important;
+    padding: 13px !important;
   }
 
   .patient-greeting-title {
-    font-size: 1.3rem !important;
+    font-size: 1.15rem !important;
   }
 
   .game-launch-card {
-    padding: 14px !important;
+    padding: 11px !important;
   }
 
   .photo-frame-wrapper {
-    height: 200px !important;
+    height: 175px !important;
   }
 }
-
 
 /* =========================================================
    LANDSCAPE PHONE
@@ -1938,12 +1927,12 @@ img {
 @media screen and (max-width: 900px) and (orientation: landscape) {
 
   .kiosk-main {
-    padding-top: 10px !important;
-    padding-bottom: 20px !important;
+    padding-top: 8px !important;
+    padding-bottom: 18px !important;
   }
 
   .patient-hero-banner {
-    padding: 16px !important;
+    padding: 14px !important;
   }
 
   .games-grid {
@@ -1952,6 +1941,6 @@ img {
   }
 
   .game-launch-card {
-    min-height: 190px !important;
+    min-height: 165px !important;
   }
 }

@@ -8,6 +8,10 @@ import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
 
+    // Your live Vercel website
+    private static final String VERCEL_URL =
+            "https://cognifit-upip.vercel.app/";
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -21,20 +25,27 @@ public class MainActivity extends BridgeActivity {
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
 
-        // IMPORTANT:
-        // Keep webpage text at normal size on Android phones
-        settings.setTextZoom(100);
+        // Slightly reduce text size on Android phones
+        settings.setTextZoom(85);
 
         // Default font sizes
         settings.setDefaultFontSize(16);
         settings.setDefaultFixedFontSize(13);
 
-        // Disable WebView zoom
+        // Disable WebView zoom controls
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
 
-        // Prevent automatic wide-screen layout scaling
-        settings.setUseWideViewPort(false);
+        // Proper responsive mobile layout
+        settings.setUseWideViewPort(true);
         settings.setLoadWithOverviewMode(false);
+
+        // Use normal web caching
+        // Vercel updates will be fetched normally
+        settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+
+        // Load the live Vercel website
+        // instead of bundled Capacitor files
+        webView.loadUrl(VERCEL_URL);
     }
 }
