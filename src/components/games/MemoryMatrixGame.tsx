@@ -4,8 +4,22 @@ import { ArrowLeft, CheckCircle2, RotateCcw } from 'lucide-react';
 import type { Language } from '../../types';
 import { translations } from '../../locales/translations';
 import { db } from '../../services/db';
+import { PatientAvatar } from '../common/PatientAvatar';
 import { audioEngine } from '../../services/audioEngine';
+import { gameVoiceBridge } from '../../services/gameVoiceBridge';
 import { adaptiveEngine } from '../../services/adaptiveEngine';
+import { useCoins } from '../../hooks/useCoins';
+import { CoinFlash, CoinPill, CoinSummaryCard } from '../common/CoinReward';
+
+const GAME_TITLES: Record<string, { en: string; as: string }> = {
+  smriti_rong: { en: 'Photo Memory & Recall', as: 'স্মৃতি ৰং (Photo Memory)' },
+  memory_matrix: { en: 'Memory Matrix', as: 'স্মৃতি মেট্ৰিক্স (Memory Matrix)' },
+  taal_xur: { en: 'Taal & Reaction Speed', as: 'তাল আৰু সঁহাৰি (Taal & Reaction)' },
+  muga_motif: { en: 'Pattern & Sequence', as: 'ক্ৰম আৰু চানেকি (Pattern & Sequence)' },
+  word_scramble: { en: 'Word Scramble & Recall', as: 'শব্দ সাঁথৰ (Word Scramble)' },
+  math_maze: { en: 'Math Maze & Logic', as: 'গণিত গোলকধাঁধা (Math Maze)' },
+  bamboo_basket: { en: 'Bamboo Basket Builder', as: 'বাঁহ টোকৰি বুনোৱা (Bamboo Basket Builder)' },
+};
 
 interface Props {
   language: Language;
@@ -40,6 +54,7 @@ export const MemoryMatrixGame: React.FC<Props> = ({ language, onBack }) => {
   const [movesCount, setMovesCount] = useState(0);
   const [isGameOver, setIsGameOver] = useState(false);
   const [adaptiveParams, setAdaptiveParams] = useState(() => adaptiveEngine.calculateAdaptiveParameters('memory_matrix'));
+  const coins = useCoins('memory_matrix');
 
   const startTimeRef = useRef<number>(Date.now());
   const tremorCountRef = useRef<number>(0);
@@ -111,6 +126,7 @@ export const MemoryMatrixGame: React.FC<Props> = ({ language, onBack }) => {
 
       if (firstCard.icon === secondCard.icon) {
         // Match found!
+        coins.recordAnswer(true);
         audioEngine.playSuccessChime();
         firstCard.isMatched = true;
         secondCard.isMatched = true;
@@ -126,22 +142,47 @@ export const MemoryMatrixGame: React.FC<Props> = ({ language, onBack }) => {
           confetti({ particleCount: 60, spread: 70 });
           audioEngine.speakPrompt(t.wellDone, language);
 
+          const accuracy = Math.max(0.4, Number((pairCount / Math.max(movesCount + 1, pairCount)).toFixed(2)));
+          
           const telemetryRecord = db.recordTelemetry({
             timestamp: Date.now(),
             gameType: 'memory_matrix',
             difficultyLevel: adaptiveParams.currentLevel,
             decisionLatencyMs: latency,
             motorLatencyMs: Math.min(latency, 800),
-            accuracy: Math.max(0.4, Number((pairCount / Math.max(movesCount + 1, pairCount)).toFixed(2))),
+            accuracy,
             tremorHesitationCount: tremorCountRef.current,
             completedSuccessfully: true,
           });
+
+          // Record activity for caregiver dashboard
+          const profile = db.getPatientProfile();
+          const gameTitle = GAME_TITLES.memory_matrix[language as keyof typeof GAME_TITLES.memory_matrix] || GAME_TITLES.memory_matrix.en;
+          db.recordActivity({
+            timestamp: Date.now(),
+            gameType: 'memory_matrix',
+            gameTitle,
+            difficultyLevel: adaptiveParams.currentLevel,
+            score: pairCount * 10,
+            maxPossibleScore: pairCount * 10,
+            durationMs: latency,
+            mistakesCount: Math.max(0, movesCount - pairCount),
+            accuracy,
+            completedSuccessfully: true,
+            patientId: profile.id,
+            patientName: profile.name,
+            coinsEarned: coins.getSessionCoins(),
+            correctAnswers: pairCount,
+            wrongAnswers: Math.max(0, movesCount - pairCount),
+          });
+          coins.commit();
 
           const updatedParams = adaptiveEngine.processTelemetry(telemetryRecord);
           setAdaptiveParams(updatedParams);
         }
       } else {
         // No match - flip back gently
+        coins.recordAnswer(false);
         setTimeout(() => {
           firstCard.isFlipped = false;
           secondCard.isFlipped = false;
@@ -153,11 +194,46 @@ export const MemoryMatrixGame: React.FC<Props> = ({ language, onBack }) => {
     }
   };
 
+  useEffect(() => {
+    gameVoiceBridge.register('memory_matrix', {
+      start: initGame,
+      next: () => {
+        if (isGameOver) {
+          initGame();
+          return true;
+        }
+        return false;
+      },
+      repeat: () => {
+        audioEngine.speakPrompt(
+          language === 'as'
+            ? 'কাৰ্ডবোৰ লুটিয়াই একে ফটোৰ জোৰা মিলাওক'
+            : 'Flip cards and find all matching pairs',
+          language
+        );
+      },
+      stop: () => {
+        coins.commit();
+        onBack();
+      },
+      readScore: () => {
+        const pts = matchesCount * 10;
+        audioEngine.speakPrompt(
+          language === 'as' ? `আপোনাৰ স্কোৰ ${pts}` : `Your score is ${pts}`,
+          language
+        );
+      },
+    });
+    return () => gameVoiceBridge.unregister('memory_matrix');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGameOver, matchesCount, language, onBack]);
+
   return (
     <div className="game-arena-container">
+      {coins.flash && <CoinFlash key={coins.flash.id} amount={coins.flash.amount} />}
       {/* Header */}
       <div className="game-arena-header">
-        <button className="btn-back-kiosk" onClick={onBack}>
+        <button className="btn-back-kiosk" onClick={() => { coins.commit(); onBack(); }}>
           <ArrowLeft size={24} />
           <span>{t.backToHome}</span>
         </button>
@@ -172,6 +248,11 @@ export const MemoryMatrixGame: React.FC<Props> = ({ language, onBack }) => {
           <div className="status-pill">
             <span>{t.movesCount}: {movesCount}</span>
           </div>
+          <CoinPill sessionCoins={coins.sessionCoins} label={t.coinsLabel} />
+        </div>
+
+        <div title={t.avatarEdit} style={{ width: '52px', height: '52px', borderRadius: '50%', background: 'var(--emerald-surface)', border: '2px solid var(--emerald-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <PatientAvatar config={db.getAvatar()} size={42} />
         </div>
       </div>
 
@@ -186,7 +267,7 @@ export const MemoryMatrixGame: React.FC<Props> = ({ language, onBack }) => {
         </div>
 
         {/* Card Grid */}
-        <div style={{
+        <div className="mm-card-grid" style={{
           display: 'grid',
           gridTemplateColumns: `repeat(${pairCount <= 3 ? 3 : 4}, 1fr)`,
           gap: '16px',
@@ -203,7 +284,7 @@ export const MemoryMatrixGame: React.FC<Props> = ({ language, onBack }) => {
                 height: '110px',
                 borderRadius: '20px',
                 border: card.isMatched ? '3px solid #10b981' : card.isFlipped ? '3px solid #3b82f6' : '3px solid #cbd5e1',
-                background: card.isMatched ? '#ecfdf5' : card.isFlipped ? '#eff6ff' : 'linear-gradient(135deg, #f8fafc, #e2e8f0)',
+                background: card.isMatched ? '#ecfdf5' : card.isFlipped ? '#eff6ff' : '#f1f5f9',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
@@ -256,6 +337,18 @@ export const MemoryMatrixGame: React.FC<Props> = ({ language, onBack }) => {
               <RotateCcw size={22} />
               <span>{t.playAgain}</span>
             </button>
+
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <CoinSummaryCard
+                labels={t}
+                score={pairCount * 10}
+                maxScore={pairCount * 10}
+                accuracy={Math.max(0.4, Number((pairCount / Math.max(movesCount, pairCount)).toFixed(2)))}
+                coinsEarned={pairCount * 5}
+                todayCoins={coins.summary.today}
+                totalCoins={coins.summary.total}
+              />
+            </div>
           </div>
         )}
       </div>

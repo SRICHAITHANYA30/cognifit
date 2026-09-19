@@ -4,8 +4,22 @@ import { ArrowLeft, CheckCircle2, RotateCcw, Sparkles } from 'lucide-react';
 import type { Language } from '../../types';
 import { translations } from '../../locales/translations';
 import { db } from '../../services/db';
+import { PatientAvatar } from '../common/PatientAvatar';
 import { audioEngine } from '../../services/audioEngine';
+import { gameVoiceBridge } from '../../services/gameVoiceBridge';
 import { adaptiveEngine } from '../../services/adaptiveEngine';
+import { useCoins } from '../../hooks/useCoins';
+import { CoinFlash, CoinPill, CoinSummaryCard } from '../common/CoinReward';
+
+const GAME_TITLES: Record<string, { en: string; as: string }> = {
+  smriti_rong: { en: 'Photo Memory & Recall', as: 'স্মৃতি ৰং (Photo Memory)' },
+  memory_matrix: { en: 'Memory Matrix', as: 'স্মৃতি মেট্ৰিক্স (Memory Matrix)' },
+  taal_xur: { en: 'Taal & Reaction Speed', as: 'তাল আৰু সঁহাৰি (Taal & Reaction)' },
+  muga_motif: { en: 'Pattern & Sequence', as: 'ক্ৰম আৰু চানেকি (Pattern & Sequence)' },
+  word_scramble: { en: 'Word Scramble & Recall', as: 'শব্দ সাঁথৰ (Word Scramble)' },
+  math_maze: { en: 'Math Maze & Logic', as: 'গণিত গোলকধাঁধা (Math Maze)' },
+  bamboo_basket: { en: 'Bamboo Basket Builder', as: 'বাঁহ টোকৰি বুনোৱা (Bamboo Basket Builder)' },
+};
 
 interface Props {
   language: Language;
@@ -38,10 +52,41 @@ export const MathMazeGame: React.FC<Props> = ({ language, onBack }) => {
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const [score, setScore] = useState(0);
+  const [questionsAnswered, setQuestionsAnswered] = useState(0);
+  const [correctAnswers, setCorrectAnswers] = useState(0);
   const [adaptiveParams, setAdaptiveParams] = useState(() => adaptiveEngine.calculateAdaptiveParameters('math_maze'));
+  const coins = useCoins('math_maze');
 
   const startTimeRef = useRef<number>(Date.now());
   const currentProblem = problems[problemIndex % problems.length];
+
+  const handleBackWithActivity = () => {
+    if (questionsAnswered > 0) {
+      const latency = Date.now() - startTimeRef.current;
+      const accuracy = correctAnswers / questionsAnswered;
+      const profile = db.getPatientProfile();
+      const gameTitle = GAME_TITLES.math_maze[language as keyof typeof GAME_TITLES.math_maze] || GAME_TITLES.math_maze.en;
+      db.recordActivity({
+        timestamp: Date.now(),
+        gameType: 'math_maze',
+        gameTitle,
+        difficultyLevel: adaptiveParams.currentLevel,
+        score,
+        maxPossibleScore: questionsAnswered * 10,
+        durationMs: latency,
+        mistakesCount: questionsAnswered - correctAnswers,
+        accuracy,
+        completedSuccessfully: accuracy >= 0.5,
+        patientId: profile.id,
+        patientName: profile.name,
+        coinsEarned: coins.getSessionCoins(),
+        correctAnswers,
+        wrongAnswers: questionsAnswered - correctAnswers,
+      });
+    }
+    coins.commit();
+    onBack();
+  };
 
   useEffect(() => {
     startTimeRef.current = Date.now();
@@ -62,6 +107,11 @@ export const MathMazeGame: React.FC<Props> = ({ language, onBack }) => {
 
     setSelectedAnswer(option);
     setIsCorrect(correct);
+    setQuestionsAnswered(prev => prev + 1);
+    if (correct) {
+      setCorrectAnswers(prev => prev + 1);
+    }
+    coins.recordAnswer(correct);
 
     if (correct) {
       setScore(s => s + 10);
@@ -92,11 +142,37 @@ export const MathMazeGame: React.FC<Props> = ({ language, onBack }) => {
     setProblemIndex(i => i + 1);
   };
 
+  useEffect(() => {
+    gameVoiceBridge.register('math_maze', {
+      start: () => {
+        setProblemIndex(0);
+      },
+      next: handleNext,
+      repeat: () => {
+        const questionVoice = language === 'as'
+          ? `${currentProblem.num1} আৰু ${currentProblem.num2} যোগ বা বিয়োগ কৰিলে কিমান হয়?`
+          : `What is ${currentProblem.num1} ${currentProblem.operator} ${currentProblem.num2}?`;
+        audioEngine.speakPrompt(questionVoice, language);
+      },
+      stop: handleBackWithActivity,
+      readScore: () => {
+        const pts = score;
+        audioEngine.speakPrompt(
+          language === 'as' ? `আপোনাৰ স্কোৰ ${pts}` : `Your score is ${pts}`,
+          language
+        );
+      },
+    });
+    return () => gameVoiceBridge.unregister('math_maze');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentProblem, score, language, onBack]);
+
   return (
     <div className="game-arena-container">
+      {coins.flash && <CoinFlash key={coins.flash.id} amount={coins.flash.amount} />}
       {/* Header */}
       <div className="game-arena-header">
-        <button className="btn-back-kiosk" onClick={onBack}>
+        <button className="btn-back-kiosk" onClick={handleBackWithActivity}>
           <ArrowLeft size={24} />
           <span>{t.backToHome}</span>
         </button>
@@ -108,6 +184,11 @@ export const MathMazeGame: React.FC<Props> = ({ language, onBack }) => {
           <div className="status-pill">
             <span>{t.score}: {score}</span>
           </div>
+          <CoinPill sessionCoins={coins.sessionCoins} label={t.coinsLabel} />
+        </div>
+
+        <div title={t.avatarEdit} style={{ width: '52px', height: '52px', borderRadius: '50%', background: 'var(--emerald-surface)', border: '2px solid var(--emerald-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <PatientAvatar config={db.getAvatar()} size={42} />
         </div>
       </div>
 
@@ -123,7 +204,7 @@ export const MathMazeGame: React.FC<Props> = ({ language, onBack }) => {
 
         {/* Calculation Stage Banner */}
         <div style={{
-          background: 'linear-gradient(135deg, #ecfdf5, #f0fdf4)',
+          background: '#ecfdf5',
           border: '3px solid #a7f3d0',
           borderRadius: '24px',
           padding: '32px',
@@ -139,7 +220,7 @@ export const MathMazeGame: React.FC<Props> = ({ language, onBack }) => {
             ))}
           </div>
 
-          <div style={{
+          <div className="math-equation" style={{
             fontSize: '48px',
             fontWeight: 900,
             color: '#064e3b',
@@ -221,6 +302,18 @@ export const MathMazeGame: React.FC<Props> = ({ language, onBack }) => {
               <span>{t.nextChallenge}</span>
             </button>
           </div>
+        )}
+
+        {questionsAnswered > 0 && (
+          <CoinSummaryCard
+            labels={t}
+            score={score}
+            maxScore={questionsAnswered * 10}
+            accuracy={correctAnswers / questionsAnswered}
+            coinsEarned={coins.sessionCoins}
+            todayCoins={coins.summary.today + coins.sessionCoins}
+            totalCoins={coins.summary.total + coins.sessionCoins}
+          />
         )}
       </div>
     </div>

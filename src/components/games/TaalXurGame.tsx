@@ -4,8 +4,22 @@ import { ArrowLeft, Sparkles, Volume2, RotateCcw } from 'lucide-react';
 import type { Language } from '../../types';
 import { translations } from '../../locales/translations';
 import { db } from '../../services/db';
+import { PatientAvatar } from '../common/PatientAvatar';
 import { audioEngine } from '../../services/audioEngine';
+import { gameVoiceBridge } from '../../services/gameVoiceBridge';
 import { adaptiveEngine } from '../../services/adaptiveEngine';
+import { useCoins } from '../../hooks/useCoins';
+import { CoinFlash, CoinPill, CoinSummaryCard } from '../common/CoinReward';
+
+const GAME_TITLES: Record<string, { en: string; as: string }> = {
+  smriti_rong: { en: 'Photo Memory & Recall', as: 'স্মৃতি ৰং (Photo Memory)' },
+  memory_matrix: { en: 'Memory Matrix', as: 'স্মৃতি মেট্ৰিক্স (Memory Matrix)' },
+  taal_xur: { en: 'Taal & Reaction Speed', as: 'তাল আৰু সঁহাৰি (Taal & Reaction)' },
+  muga_motif: { en: 'Pattern & Sequence', as: 'ক্ৰম আৰু চানেকি (Pattern & Sequence)' },
+  word_scramble: { en: 'Word Scramble & Recall', as: 'শব্দ সাঁথৰ (Word Scramble)' },
+  math_maze: { en: 'Math Maze & Logic', as: 'গণিত গোলকধাঁধা (Math Maze)' },
+  bamboo_basket: { en: 'Bamboo Basket Builder', as: 'বাঁহ টোকৰি বুনোৱা (Bamboo Basket Builder)' },
+};
 
 interface Props {
   language: Language;
@@ -18,14 +32,48 @@ export const TaalXurGame: React.FC<Props> = ({ language, onBack }) => {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [feedbackType, setFeedbackType] = useState<'perfect' | 'good' | 'miss' | null>(null);
   const [score, setScore] = useState(0);
+  const [tapsCount, setTapsCount] = useState(0);
+  const [perfectTaps, setPerfectTaps] = useState(0);
+  const [goodTaps, setGoodTaps] = useState(0);
   const [ringScale, setRingScale] = useState(1.8);
   const [beatCount, setBeatCount] = useState(0);
   const [adaptiveParams, setAdaptiveParams] = useState(() => adaptiveEngine.calculateAdaptiveParameters('taal_xur'));
+  const coins = useCoins('taal_xur');
 
   const animFrameRef = useRef<number | null>(null);
   const beatTargetTimeRef = useRef<number>(0);
-  const beatIntervalMs = 1400; // Calibrated comfortable 42-45 BPM tempo for elderly MCI motor pace
+  const beatIntervalMs = 1400;
   const tapRegisteredForCurrentBeatRef = useRef<boolean>(false);
+  const sessionStartRef = useRef<number>(Date.now());
+
+  const handleStopWithActivity = () => {
+    if (tapsCount > 0) {
+      const latency = Date.now() - sessionStartRef.current;
+      const accuracy = (perfectTaps * 1.0 + goodTaps * 0.7) / tapsCount;
+      const profile = db.getPatientProfile();
+      const gameTitle = GAME_TITLES.taal_xur[language as keyof typeof GAME_TITLES.taal_xur] || GAME_TITLES.taal_xur.en;
+      db.recordActivity({
+        timestamp: Date.now(),
+        gameType: 'taal_xur',
+        gameTitle,
+        difficultyLevel: adaptiveParams.currentLevel,
+        score,
+        maxPossibleScore: tapsCount * 20,
+        durationMs: latency,
+        mistakesCount: tapsCount - perfectTaps - goodTaps,
+        accuracy,
+        completedSuccessfully: accuracy >= 0.5,
+        patientId: profile.id,
+        patientName: profile.name,
+        coinsEarned: coins.getSessionCoins(),
+        correctAnswers: perfectTaps + goodTaps,
+        wrongAnswers: tapsCount - perfectTaps - goodTaps,
+      });
+    }
+    coins.commit();
+    handleStop();
+    onBack();
+  };
 
   useEffect(() => {
     // Gentle intro voice prompt
@@ -94,7 +142,11 @@ export const TaalXurGame: React.FC<Props> = ({ language, onBack }) => {
   const handleStart = () => {
     setIsPlaying(true);
     setScore(0);
+    setTapsCount(0);
+    setPerfectTaps(0);
+    setGoodTaps(0);
     setFeedback(null);
+    sessionStartRef.current = Date.now();
   };
 
   const handleStop = () => {
@@ -112,12 +164,16 @@ export const TaalXurGame: React.FC<Props> = ({ language, onBack }) => {
     const timeDelta = Math.abs(beatTargetTimeRef.current - now);
     tapRegisteredForCurrentBeatRef.current = true;
 
+    setTapsCount(prev => prev + 1);
+
     const tolerance = adaptiveParams.rhythmToleranceMs; // ~140ms
     let accuracy = 0;
 
     if (timeDelta <= tolerance) {
       // Perfect tap!
       accuracy = 1.0;
+      setPerfectTaps(prev => prev + 1);
+      coins.recordAnswer(true);
       setScore(s => s + 20);
       setFeedback(t.perfectTiming);
       setFeedbackType('perfect');
@@ -127,6 +183,8 @@ export const TaalXurGame: React.FC<Props> = ({ language, onBack }) => {
     } else if (timeDelta <= tolerance * 2) {
       // Good tap
       accuracy = 0.7;
+      setGoodTaps(prev => prev + 1);
+      coins.recordAnswer(true);
       setScore(s => s + 10);
       setFeedback(t.goodTiming);
       setFeedbackType('good');
@@ -134,6 +192,7 @@ export const TaalXurGame: React.FC<Props> = ({ language, onBack }) => {
     } else {
       // Missed timing
       accuracy = 0.3;
+      coins.recordAnswer(false);
       setFeedback(t.missedTiming);
       setFeedbackType('miss');
       audioEngine.playSoftGuidance();
@@ -155,11 +214,38 @@ export const TaalXurGame: React.FC<Props> = ({ language, onBack }) => {
     setAdaptiveParams(updatedParams);
   };
 
+  useEffect(() => {
+    gameVoiceBridge.register('taal_xur', {
+      start: handleStart,
+      pause: handleStop,
+      resume: handleStart,
+      stop: handleStopWithActivity,
+      repeat: () => {
+        audioEngine.speakPrompt(
+          language === 'as'
+            ? 'ঢোলৰ বৃত্তটো সোঁমাজলৈ আহিলে স্পৰ্শ কৰক'
+            : 'Tap the center drum when the outer ring shrinks into place',
+          language
+        );
+      },
+      readScore: () => {
+        const pts = score;
+        audioEngine.speakPrompt(
+          language === 'as' ? `আপোনাৰ স্কোৰ ${pts}` : `Your score is ${pts}`,
+          language
+        );
+      },
+    });
+    return () => gameVoiceBridge.unregister('taal_xur');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlaying, score, language, onBack]);
+
   return (
     <div className="game-arena-container">
+      {coins.flash && <CoinFlash key={coins.flash.id} amount={coins.flash.amount} />}
       {/* Header */}
       <div className="game-arena-header">
-        <button className="btn-back-kiosk" onClick={() => { handleStop(); onBack(); }}>
+        <button className="btn-back-kiosk" onClick={handleStopWithActivity}>
           <ArrowLeft size={24} />
           <span>{t.backToHome}</span>
         </button>
@@ -171,6 +257,11 @@ export const TaalXurGame: React.FC<Props> = ({ language, onBack }) => {
           <div className="status-pill">
             <span>{t.score}: {score}</span>
           </div>
+          <CoinPill sessionCoins={coins.sessionCoins} label={t.coinsLabel} />
+        </div>
+
+        <div title={t.avatarEdit} style={{ width: '52px', height: '52px', borderRadius: '50%', background: 'var(--emerald-surface)', border: '2px solid var(--emerald-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <PatientAvatar config={db.getAvatar()} size={42} />
         </div>
       </div>
 
@@ -249,6 +340,18 @@ export const TaalXurGame: React.FC<Props> = ({ language, onBack }) => {
             </button>
           )}
         </div>
+
+        {tapsCount > 0 && (
+          <CoinSummaryCard
+            labels={t}
+            score={score}
+            maxScore={tapsCount * 20}
+            accuracy={(perfectTaps + goodTaps * 0.7) / tapsCount}
+            coinsEarned={coins.sessionCoins}
+            todayCoins={coins.summary.today + coins.sessionCoins}
+            totalCoins={coins.summary.total + coins.sessionCoins}
+          />
+        )}
       </div>
     </div>
   );

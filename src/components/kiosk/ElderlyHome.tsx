@@ -12,24 +12,36 @@ import {
   Type, 
   Calculator, 
   BellRing,
-  ArrowRight
+  ArrowRight,
+  Heart,
+  AudioLines,
+  Eye,
+  ListOrdered,
+  Pencil,
+  GitBranch,
+  Puzzle
 } from 'lucide-react';
 import type { GameType, Language, ReminderItem } from '../../types';
 import { translations } from '../../locales/translations';
 import { db } from '../../services/db';
 import { audioEngine } from '../../services/audioEngine';
+import { PatientAvatar } from '../common/PatientAvatar';
 
 interface Props {
   language: Language;
   onLaunchGame: (game: GameType) => void;
   onOpenCaregiver: () => void;
   onOpenReminders: () => void;
+  onOpenVoiceAssistant: () => void;
+  onEditAvatar: () => void;
 }
 
 export const ElderlyHome: React.FC<Props> = ({ 
   language, 
   onLaunchGame, 
-  onOpenReminders 
+  onOpenReminders,
+  onOpenVoiceAssistant,
+  onEditAvatar 
 }) => {
   const t = translations[language] || translations['en'];
   const profile = db.getPatientProfile();
@@ -43,18 +55,15 @@ export const ElderlyHome: React.FC<Props> = ({
   const [sosModalOpen, setSosModalOpen] = useState(false);
 
   const handleVoiceHelp = () => {
-    const greeting = language === 'as'
-      ? 'নমস্কাৰ প্ৰণৱ ডাঙৰীয়া! মই আপোনাৰ ব্ৰেইনএক্টিভাৰ সহায়িকা। আপোনাৰ দিনটো শান্তিপূৰ্ণ আৰু সক্ৰিয় হওক। আজিৰ খেল খেলিলে আপোনাৰ মগজুৰ সক্ৰিয়তা বৃদ্ধি পাব।'
-      : 'Hello! I am your Brainactiver cognitive wellness companion. Wishing you an active, sharp, and peaceful day.';
+    const greeting = t.voiceHelpGreeting;
     audioEngine.speakPrompt(greeting, language);
+    onOpenVoiceAssistant();
   };
 
   const handleEmergencyCall = () => {
     audioEngine.playSoftGuidance();
     setSosModalOpen(true);
-    const alertSpeech = language === 'as'
-      ? 'আপোনাৰ পৰিয়াল আৰু স্বাস্থ্য কৰ্মীক জাননী প্ৰেৰণ কৰা হৈছে।'
-      : 'Alerting your designated family caregiver.';
+    const alertSpeech = t.emergencyCallAlert;
     audioEngine.speakPrompt(alertSpeech, language);
   };
 
@@ -65,9 +74,7 @@ export const ElderlyHome: React.FC<Props> = ({
   };
 
   const handlePlayReminderAudio = (item: ReminderItem) => {
-    const text = language === 'as' 
-      ? `মনত পেলাই দিছোঁ: ${item.title}। ${item.note}`
-      : `Reminder: ${item.title}. ${item.note}`;
+    const text = t.reminderAudioPrefix.replace('{title}', item.title).replace('{note}', item.note);
     audioEngine.speakPrompt(text, language);
   };
 
@@ -75,13 +82,50 @@ export const ElderlyHome: React.FC<Props> = ({
     <div>
       {/* Patient Hero Welcome Card */}
       <section className="patient-hero-banner">
-        <div>
-          <h1 className="patient-greeting-title">
-            {t.welcomePatient}
-          </h1>
-          <p className="patient-greeting-sub">
-            {t.dailyRoutineGreeting} • {profile.location}
-          </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '18px', zIndex: 2 }}>
+          <button
+            onClick={onEditAvatar}
+            title={t.avatarEdit}
+            aria-label={t.avatarEdit}
+            style={{
+              position: 'relative',
+              background: 'rgba(255,255,255,0.16)',
+              border: '3px solid rgba(255,255,255,0.6)',
+              borderRadius: '50%',
+              padding: '6px',
+              cursor: 'pointer',
+              lineHeight: 0,
+              flexShrink: 0,
+            }}
+          >
+            <PatientAvatar config={db.getAvatar()} size={76} />
+            <span
+              style={{
+                position: 'absolute',
+                right: '-2px',
+                bottom: '-2px',
+                width: '26px',
+                height: '26px',
+                borderRadius: '50%',
+                background: 'var(--muga-gold)',
+                color: 'white',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: '2px solid white',
+              }}
+            >
+              <Pencil size={13} />
+            </span>
+          </button>
+          <div>
+            <h1 className="patient-greeting-title">
+              {t.welcomePatient}
+            </h1>
+            <p className="patient-greeting-sub">
+              {t.dailyRoutineGreeting} • {profile.location}
+            </p>
+          </div>
         </div>
 
         <div className="hero-quick-actions">
@@ -131,6 +175,7 @@ export const ElderlyHome: React.FC<Props> = ({
               className={`routine-card ${item.enabled ? 'active-time' : 'completed'}`}
             >
               <div>
+                <Heart size={16} className="routine-card-icon" />
                 <span className="routine-time-badge">{item.time}</span>
                 <h3 className="routine-item-title">{item.title}</h3>
                 <p className="routine-item-desc">{item.note}</p>
@@ -230,7 +275,7 @@ export const ElderlyHome: React.FC<Props> = ({
           >
             <div>
               <div className="game-card-icon-wrapper icon-amber">
-                <Sparkles size={34} />
+                <GitBranch size={34} />
               </div>
               <h3 className="game-card-title">{t.game4Title}</h3>
               <p className="game-card-sub">{t.game4Subtitle}</p>
@@ -276,6 +321,78 @@ export const ElderlyHome: React.FC<Props> = ({
               <span>{t.tapToStart}</span>
             </button>
           </div>
+
+          {/* Game 7: Bamboo Basket Builder (Sequencing & Spatial Logic) */}
+          <div
+            className="game-launch-card"
+            onClick={() => onLaunchGame('bamboo_basket')}
+          >
+            <div>
+              <div className="game-card-icon-wrapper icon-amber">
+                <Puzzle size={34} />
+              </div>
+              <h3 className="game-card-title">{t.game7Title}</h3>
+              <p className="game-card-sub">{t.game7Subtitle}</p>
+            </div>
+
+            <button className="btn-game-play btn-play-amber">
+              <span>{t.tapToStart}</span>
+            </button>
+          </div>
+
+          {/* Game 8: Music Match (Relaxing Sound Pairs) */}
+          <div
+            className="game-launch-card"
+            onClick={() => onLaunchGame('music_match')}
+          >
+            <div>
+              <div className="game-card-icon-wrapper icon-emerald">
+                <AudioLines size={34} />
+              </div>
+              <h3 className="game-card-title">{t.game8Title}</h3>
+              <p className="game-card-sub">{t.game8Subtitle}</p>
+            </div>
+
+            <button className="btn-game-play btn-play-emerald">
+              <span>{t.tapToStart}</span>
+            </button>
+          </div>
+
+          {/* Game 9: What Changed? (Attention & Observation) */}
+          <div
+            className="game-launch-card"
+            onClick={() => onLaunchGame('what_changed')}
+          >
+            <div>
+              <div className="game-card-icon-wrapper icon-teal">
+                <Eye size={34} />
+              </div>
+              <h3 className="game-card-title">{t.game9Title}</h3>
+              <p className="game-card-sub">{t.game9Subtitle}</p>
+            </div>
+
+            <button className="btn-game-play btn-play-teal">
+              <span>{t.tapToStart}</span>
+            </button>
+          </div>
+
+          {/* Game 10: Number Mismatch (Number Order & Mismatch Detection) */}
+          <div
+            className="game-launch-card"
+            onClick={() => onLaunchGame('number_mismatch')}
+          >
+            <div>
+              <div className="game-card-icon-wrapper icon-indigo">
+                <ListOrdered size={34} />
+              </div>
+              <h3 className="game-card-title">{t.game10Title}</h3>
+              <p className="game-card-sub">{t.game10Subtitle}</p>
+            </div>
+
+            <button className="btn-game-play btn-play-emerald">
+              <span>{t.tapToStart}</span>
+            </button>
+          </div>
         </div>
       </section>
 
@@ -302,8 +419,8 @@ export const ElderlyHome: React.FC<Props> = ({
             </h3>
 
             <p style={{ fontSize: '16px', color: 'var(--text-secondary)', marginBottom: '20px' }}>
-              Primary Contact: Daughter Jonali Baruah ({profile.caregiverContact})<br />
-              Helpline: 108 (Health Emergency)
+              {t.primaryContact}: {t.daughterJonali} ({profile.caregiverContact})<br />
+              {t.helpline}: 108 ({t.healthEmergency})
             </p>
 
             <button
@@ -312,7 +429,7 @@ export const ElderlyHome: React.FC<Props> = ({
               onClick={() => alert(`Calling: ${profile.caregiverContact}`)}
             >
               <PhoneCall size={20} />
-              <span>Direct Call Now</span>
+              <span>{t.directCallNow}</span>
             </button>
 
             <button
@@ -320,7 +437,7 @@ export const ElderlyHome: React.FC<Props> = ({
               style={{ width: '100%', justifyContent: 'center' }}
               onClick={() => setSosModalOpen(false)}
             >
-              <span>Close</span>
+              <span>{t.closeButton}</span>
             </button>
           </div>
         </div>

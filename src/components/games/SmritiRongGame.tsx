@@ -4,8 +4,22 @@ import { ArrowLeft, Volume2, Sparkles, Eye, CheckCircle2, RotateCcw } from 'luci
 import type { Language, MemoryVaultItem } from '../../types';
 import { translations } from '../../locales/translations';
 import { db } from '../../services/db';
+import { PatientAvatar } from '../common/PatientAvatar';
 import { audioEngine } from '../../services/audioEngine';
+import { gameVoiceBridge } from '../../services/gameVoiceBridge';
 import { adaptiveEngine } from '../../services/adaptiveEngine';
+import { useCoins } from '../../hooks/useCoins';
+import { CoinFlash, CoinPill, CoinSummaryCard } from '../common/CoinReward';
+
+const GAME_TITLES: Record<string, { en: string; as: string }> = {
+  smriti_rong: { en: 'Photo Memory & Recall', as: 'স্মৃতি ৰং (Photo Memory)' },
+  memory_matrix: { en: 'Memory Matrix', as: 'স্মৃতি মেট্ৰিক্স (Memory Matrix)' },
+  taal_xur: { en: 'Taal & Reaction Speed', as: 'তাল আৰু সঁহাৰি (Taal & Reaction)' },
+  muga_motif: { en: 'Pattern & Sequence', as: 'ক্ৰম আৰু চানেকি (Pattern & Sequence)' },
+  word_scramble: { en: 'Word Scramble & Recall', as: 'শব্দ সাঁথৰ (Word Scramble)' },
+  math_maze: { en: 'Math Maze & Logic', as: 'গণিত গোলকধাঁধা (Math Maze)' },
+  bamboo_basket: { en: 'Bamboo Basket Builder', as: 'বাঁহ টোকৰি বুনোৱা (Bamboo Basket Builder)' },
+};
 
 interface Props {
   language: Language;
@@ -20,10 +34,42 @@ export const SmritiRongGame: React.FC<Props> = ({ language, onBack }) => {
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const [score, setScore] = useState(0);
+  const [questionsAnswered, setQuestionsAnswered] = useState(0);
+  const [correctAnswers, setCorrectAnswers] = useState(0);
   const [adaptiveParams, setAdaptiveParams] = useState(() => adaptiveEngine.calculateAdaptiveParameters('smriti_rong'));
+  const coins = useCoins('smriti_rong');
 
   const startTimeRef = useRef<number>(Date.now());
   const tremorTapsRef = useRef<number>(0);
+
+  const handleBackWithActivity = () => {
+    // Record activity summary when leaving
+    if (questionsAnswered > 0) {
+      const latency = Date.now() - startTimeRef.current;
+      const accuracy = correctAnswers / questionsAnswered;
+      const profile = db.getPatientProfile();
+      const gameTitle = GAME_TITLES.smriti_rong[language as keyof typeof GAME_TITLES.smriti_rong] || GAME_TITLES.smriti_rong.en;
+      db.recordActivity({
+        timestamp: Date.now(),
+        gameType: 'smriti_rong',
+        gameTitle,
+        difficultyLevel: adaptiveParams.currentLevel,
+        score,
+        maxPossibleScore: questionsAnswered * 10,
+        durationMs: latency,
+        mistakesCount: questionsAnswered - correctAnswers,
+        accuracy,
+        completedSuccessfully: accuracy >= 0.5,
+        patientId: profile.id,
+        patientName: profile.name,
+        coinsEarned: coins.getSessionCoins(),
+        correctAnswers,
+        wrongAnswers: questionsAnswered - correctAnswers,
+      });
+    }
+    coins.commit();
+    onBack();
+  };
 
   const currentItem = vaultItems[currentIndex % vaultItems.length];
 
@@ -82,6 +128,11 @@ export const SmritiRongGame: React.FC<Props> = ({ language, onBack }) => {
     setSelectedAnswer(option);
     setIsCorrect(correct);
     setIsRevealed(true);
+    setQuestionsAnswered(prev => prev + 1);
+    if (correct) {
+      setCorrectAnswers(prev => prev + 1);
+    }
+    coins.recordAnswer(correct);
 
     if (correct) {
       setScore(prev => prev + 10);
@@ -120,11 +171,32 @@ export const SmritiRongGame: React.FC<Props> = ({ language, onBack }) => {
     setCurrentIndex(prev => prev + 1);
   };
 
+  useEffect(() => {
+    gameVoiceBridge.register('smriti_rong', {
+      start: () => {
+        setCurrentIndex(0);
+      },
+      next: handleNext,
+      repeat: handlePlayVoice,
+      stop: handleBackWithActivity,
+      readScore: () => {
+        const pts = score;
+        audioEngine.speakPrompt(
+          language === 'as' ? `আপোনাৰ স্কোৰ ${pts}` : `Your score is ${pts}`,
+          language
+        );
+      },
+    });
+    return () => gameVoiceBridge.unregister('smriti_rong');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [language, onBack, coins, score]);
+
   return (
     <div className="game-arena-container">
+      {coins.flash && <CoinFlash key={coins.flash.id} amount={coins.flash.amount} />}
       {/* Header */}
       <div className="game-arena-header">
-        <button className="btn-back-kiosk" onClick={onBack}>
+        <button className="btn-back-kiosk" onClick={handleBackWithActivity}>
           <ArrowLeft size={24} />
           <span>{t.backToHome}</span>
         </button>
@@ -136,6 +208,11 @@ export const SmritiRongGame: React.FC<Props> = ({ language, onBack }) => {
           <div className="status-pill">
             <span>{t.score}: {score}</span>
           </div>
+          <CoinPill sessionCoins={coins.sessionCoins} label={t.coinsLabel} />
+        </div>
+
+        <div title={t.avatarEdit} style={{ width: '52px', height: '52px', borderRadius: '50%', background: 'var(--emerald-surface)', border: '2px solid var(--emerald-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <PatientAvatar config={db.getAvatar()} size={42} />
         </div>
       </div>
 
@@ -222,6 +299,18 @@ export const SmritiRongGame: React.FC<Props> = ({ language, onBack }) => {
               <span>{t.nextChallenge}</span>
             </button>
           </div>
+        )}
+
+        {questionsAnswered > 0 && (
+          <CoinSummaryCard
+            labels={t}
+            score={score}
+            maxScore={questionsAnswered * 10}
+            accuracy={correctAnswers / questionsAnswered}
+            coinsEarned={coins.sessionCoins}
+            todayCoins={coins.summary.today + coins.sessionCoins}
+            totalCoins={coins.summary.total + coins.sessionCoins}
+          />
         )}
       </div>
     </div>

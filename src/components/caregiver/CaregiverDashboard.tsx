@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Activity, 
   ArrowLeft, 
@@ -10,13 +10,30 @@ import {
   CheckCircle2, 
   HeartHandshake, 
   ShieldCheck, 
-  Calendar 
+  Calendar,
+  Bell,
+  AlertCircle,
+  Clock
 } from 'lucide-react';
-import type { DailyCsiScore, Language, MemoryVaultItem, PatientProfile } from '../../types';
+import type { DailyCsiScore, Language, MemoryVaultItem, PatientProfile, ActivityRecord, ReminderEvent } from '../../types';
 import { translations } from '../../locales/translations';
-import { db } from '../../services/db';
+import { REMINDER_EVENTS_STORAGE_KEY, db } from '../../services/db';
 import { audioEngine } from '../../services/audioEngine';
+import { formatTime12h } from '../../services/reminderScheduler';
 import { generateClinicalPdfReport } from '../../services/pdfReport';
+
+const GAME_TYPE_LABELS: Record<string, string> = {
+  smriti_rong: 'Photo Memory',
+  memory_matrix: 'Memory Matrix',
+  taal_xur: 'Taal & Reflex',
+  muga_motif: 'Pattern & Sequence',
+  word_scramble: 'Word Scramble',
+  math_maze: 'Math Maze',
+  bamboo_basket: 'Bamboo Basket Builder',
+  music_match: 'Music Match',
+  what_changed: 'What Changed?',
+  number_mismatch: 'Number Mismatch',
+};
 
 interface Props {
   language: Language;
@@ -31,6 +48,109 @@ export const CaregiverDashboard: React.FC<Props> = ({ language, onBackToKiosk })
   const [syncStatus, setSyncStatus] = useState(() => db.getSyncStatus());
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [activities, setActivities] = useState<ActivityRecord[]>(() => db.getActivities());
+  const [showNotification, setShowNotification] = useState<ActivityRecord | null>(null);
+  // Missed-reminder feed written by the reminder scheduler (same offline store).
+  const [missedReminders, setMissedReminders] = useState<ReminderEvent[]>(() => {
+    try {
+      return db.getMissedReminderEvents(profile.id);
+    } catch {
+      return [];
+    }
+  });
+  const [missedToast, setMissedToast] = useState<ReminderEvent | null>(null);
+  const lastMissedToastKey = useRef<string | null>(null);
+
+  // Listen for real-time activity updates
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'brainactiver_activities_v2' && e.newValue) {
+        const newActivities = JSON.parse(e.newValue);
+        setActivities(newActivities);
+        
+        // Show notification for the latest activity
+        if (newActivities.length > 0) {
+          const latest = newActivities[0];
+          setShowNotification(latest);
+          audioEngine.playSuccessChime();
+          
+          // Auto-hide notification after 5 seconds
+          setTimeout(() => setShowNotification(null), 5000);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also poll for updates (for same-tab updates)
+    const interval = setInterval(() => {
+      const currentActivities = db.getActivities();
+      if (JSON.stringify(currentActivities) !== JSON.stringify(activities)) {
+        setActivities(currentActivities);
+        if (currentActivities.length > 0) {
+          const latest = currentActivities[0];
+          setShowNotification(latest);
+          audioEngine.playSuccessChime();
+          setTimeout(() => setShowNotification(null), 5000);
+        }
+      }
+    }, 2000);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, [activities.length, language]);
+
+  // Listen for real-time missed-reminder updates from the reminder scheduler.
+  // Same architecture as the activity feed: synthetic storage events for
+  // cross-tab updates plus polling for same-tab writes.
+  useEffect(() => {
+    const readMissed = (): ReminderEvent[] => {
+      try {
+        return db.getMissedReminderEvents(profile.id);
+      } catch {
+        return [];
+      }
+    };
+
+    const announceLatest = (current: ReminderEvent[]) => {
+      if (current.length === 0) {
+        return;
+      }
+      const latest = current[0];
+      if (latest.occurrenceKey !== lastMissedToastKey.current) {
+        lastMissedToastKey.current = latest.occurrenceKey;
+        setMissedToast(latest);
+        audioEngine.playAlarmChime();
+        setTimeout(() => setMissedToast(null), 8000);
+      }
+    };
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === REMINDER_EVENTS_STORAGE_KEY && e.newValue) {
+        const current = readMissed();
+        setMissedReminders(current);
+        announceLatest(current);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    // Also poll for updates (for same-tab updates)
+    const interval = setInterval(() => {
+      const current = readMissed();
+      if (JSON.stringify(current) !== JSON.stringify(missedReminders)) {
+        setMissedReminders(current);
+        announceLatest(current);
+      }
+    }, 2000);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, [missedReminders.length, profile.id]);
 
   // New Memory Vault item state
   const [isAddingVaultItem, setIsAddingVaultItem] = useState(false);
@@ -50,6 +170,8 @@ export const CaregiverDashboard: React.FC<Props> = ({ language, onBackToKiosk })
     sessionCount: 4,
     clinicalNote: 'Stable metrics.',
   };
+
+  const coinSummary = db.getCoinSummary();
 
   const handleSyncWithPhc = async () => {
     setIsSyncing(true);
@@ -174,6 +296,79 @@ export const CaregiverDashboard: React.FC<Props> = ({ language, onBackToKiosk })
         }}>
           <CheckCircle2 size={24} />
           <span>{syncMessage}</span>
+        </div>
+      )}
+
+      {/* Real-time Activity Notification */}
+      {showNotification && (
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          zIndex: 1000,
+          padding: '16px 20px',
+          borderRadius: '16px',
+          background: '#fffbeb',
+          border: '2px solid #f59e0b',
+          color: '#92400e',
+          fontWeight: 600,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          boxShadow: 'var(--shadow-lg)',
+          maxWidth: '400px',
+          animation: 'slideIn 0.3s ease'
+        }}>
+          <AlertCircle size={24} color="#f59e0b" />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '14px', fontWeight: 800 }}>
+              New Activity: {GAME_TYPE_LABELS[showNotification.gameType] || showNotification.gameType}
+            </div>
+            <div style={{ fontSize: '12px', color: '#b45309' }}>
+              Score: {showNotification.score}/{showNotification.maxPossibleScore} • {Math.round(showNotification.accuracy * 100)}% accuracy
+              {typeof showNotification.coinsEarned === 'number' && showNotification.coinsEarned > 0 ? ` • +${showNotification.coinsEarned} 🪙` : ''}
+              {typeof showNotification.correctAnswers === 'number' ? ` • ${showNotification.correctAnswers} correct` : ''}
+              {typeof showNotification.wrongAnswers === 'number' && showNotification.wrongAnswers > 0 ? ` / ${showNotification.wrongAnswers} wrong` : ''}
+            </div>
+          </div>
+          <button onClick={() => setShowNotification(null)} style={{ background: 'none', border: 'none', color: '#92400e', cursor: 'pointer' }}>
+            ×
+          </button>
+        </div>
+      )}
+
+      {/* Missed Reminder Notification */}
+      {missedToast && (
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          zIndex: 1000,
+          padding: '16px 20px',
+          borderRadius: '16px',
+          background: '#fef2f2',
+          border: '2px solid #f87171',
+          color: '#991b1b',
+          fontWeight: 600,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          boxShadow: 'var(--shadow-lg)',
+          maxWidth: '400px',
+          animation: 'slideIn 0.3s ease'
+        }}>
+          <AlertCircle size={24} color="#dc2626" />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '14px', fontWeight: 800 }}>
+              Missed Reminder: {missedToast.title}
+            </div>
+            <div style={{ fontSize: '12px', color: '#b91c1c' }}>
+              {missedToast.patientName} • Scheduled {formatTime12h(missedToast.scheduledTime)} • Missed {new Date(missedToast.missedAt || missedToast.triggeredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </div>
+          </div>
+          <button onClick={() => setMissedToast(null)} style={{ background: 'none', border: 'none', color: '#991b1b', cursor: 'pointer' }}>
+            ×
+          </button>
         </div>
       )}
 
@@ -303,7 +498,7 @@ export const CaregiverDashboard: React.FC<Props> = ({ language, onBackToKiosk })
               }}>
                 <h4 style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>{t.addFamilyPhoto}</h4>
                 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="form-grid-2col" style={{ display: 'grid', gap: '12px' }}>
                   <div>
                     <label style={{ fontSize: '12px', fontWeight: 700, color: '#475569' }}>{t.photoTitleLabel} (English)</label>
                     <input
@@ -327,7 +522,7 @@ export const CaregiverDashboard: React.FC<Props> = ({ language, onBackToKiosk })
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="form-grid-2col" style={{ display: 'grid', gap: '12px' }}>
                   <div>
                     <label style={{ fontSize: '12px', fontWeight: 700, color: '#475569' }}>{t.relationLabel} (English)</label>
                     <input
@@ -394,7 +589,7 @@ export const CaregiverDashboard: React.FC<Props> = ({ language, onBackToKiosk })
             )}
 
             {/* Vault items cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px' }}>
+            <div className="vault-grid" style={{ display: 'grid', gap: '16px' }}>
               {vaultItems.map((item) => (
                 <div key={item.id} style={{
                   border: '1px solid #e2e8f0',
@@ -530,6 +725,143 @@ export const CaregiverDashboard: React.FC<Props> = ({ language, onBackToKiosk })
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Activity History Card */}
+        <div className="dashboard-card" style={{ borderTop: '6px solid #059669' }}>
+          <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Bell size={20} color="#059669" />
+            <span>Real-time Activity History</span>
+            <span style={{ fontSize: '12px', color: '#059669', background: '#ecfdf5', padding: '2px 8px', borderRadius: '999px' }}>
+              {activities.length} activities
+            </span>
+            <span style={{ fontSize: '12px', color: '#b45309', background: '#fffbeb', padding: '2px 8px', borderRadius: '999px' }}>
+              🪙 {coinSummary.today} today · {coinSummary.total} total
+            </span>
+          </h3>
+
+          {activities.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '24px', color: '#94a3b8' }}>
+              <Clock size={32} style={{ marginBottom: '8px', opacity: 0.5 }} />
+              <p>No activities recorded yet</p>
+              <p style={{ fontSize: '13px' }}>Patient activities will appear here in real-time</p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '300px', overflow: 'auto' }}>
+              {activities.slice(0, 10).map((activity) => (
+                <div key={activity.id} style={{
+                  padding: '14px 16px',
+                  borderRadius: '12px',
+                  background: activity.completedSuccessfully ? '#ecfdf5' : '#fef3c7',
+                  border: `1px solid ${activity.completedSuccessfully ? '#a7f3d0' : '#fde68a'}`,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '12px'
+                }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>
+                        {GAME_TYPE_LABELS[activity.gameType] || activity.gameType}
+                      </span>
+                      <span style={{
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        padding: '2px 8px',
+                        borderRadius: '999px',
+                        background: activity.completedSuccessfully ? '#d1fae5' : '#fef3c7',
+                        color: activity.completedSuccessfully ? '#065f46' : '#92400e'
+                      }}>
+                        {activity.completedSuccessfully ? 'Completed' : 'Partial'}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#64748b', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                      <span>Score: {activity.score}/{activity.maxPossibleScore}</span>
+                      <span>Accuracy: {Math.round(activity.accuracy * 100)}%</span>
+                      <span>Duration: {Math.round(activity.durationMs / 1000)}s</span>
+                      {typeof activity.coinsEarned === 'number' && activity.coinsEarned > 0 && (
+                        <span style={{ color: '#b45309', fontWeight: 700 }}>Coins: {activity.coinsEarned} 🪙</span>
+                      )}
+                      {typeof activity.correctAnswers === 'number' && (
+                        <span style={{ color: '#059669' }}>Correct: {activity.correctAnswers}</span>
+                      )}
+                      {typeof activity.wrongAnswers === 'number' && activity.wrongAnswers > 0 && (
+                        <span style={{ color: '#dc2626' }}>Wrong: {activity.wrongAnswers}</span>
+                      )}
+                      {activity.mistakesCount > 0 && <span style={{ color: '#dc2626' }}>Mistakes: {activity.mistakesCount}</span>}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right', fontSize: '11px', color: '#94a3b8', whiteSpace: 'nowrap' }}>
+                    <div>{new Date(activity.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                    <div>{new Date(activity.timestamp).toLocaleDateString()}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Missed Reminders Card */}
+        <div className="dashboard-card" style={{ borderTop: '6px solid #dc2626' }}>
+          <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Bell size={20} color="#dc2626" />
+            <span>Missed Reminders</span>
+            <span style={{ fontSize: '12px', color: '#991b1b', background: '#fee2e2', padding: '2px 8px', borderRadius: '999px' }}>
+              {missedReminders.length} missed
+            </span>
+          </h3>
+
+          {missedReminders.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '24px', color: '#94a3b8' }}>
+              <Clock size={32} style={{ marginBottom: '8px', opacity: 0.5 }} />
+              <p>No missed reminders</p>
+              <p style={{ fontSize: '13px' }}>Scheduled reminders that are not acknowledged on time will appear here</p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '300px', overflow: 'auto' }}>
+              {missedReminders.slice(0, 10).map((event) => (
+                <div key={event.occurrenceKey} style={{
+                  padding: '14px 16px',
+                  borderRadius: '12px',
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '12px'
+                }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>
+                        {event.title}
+                      </span>
+                      <span style={{
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        padding: '2px 8px',
+                        borderRadius: '999px',
+                        background: '#fee2e2',
+                        color: '#991b1b'
+                      }}>
+                        MISSED
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#64748b', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                      <span>Patient: {event.patientName}</span>
+                      <span>Scheduled: {event.scheduledDate} {formatTime12h(event.scheduledTime)}</span>
+                      <span style={{ color: '#dc2626', fontWeight: 700 }}>
+                        Missed at: {new Date(event.missedAt || event.triggeredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right', fontSize: '11px', color: '#94a3b8', whiteSpace: 'nowrap' }}>
+                    <div>{formatTime12h(event.scheduledTime)}</div>
+                    <div>{event.scheduledDate}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

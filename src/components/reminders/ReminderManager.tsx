@@ -19,6 +19,7 @@ import type { Language, ReminderFrequency, ReminderItem } from '../../types';
 import { translations } from '../../locales/translations';
 import { db } from '../../services/db';
 import { audioEngine } from '../../services/audioEngine';
+import { PatientAvatar } from '../common/PatientAvatar';
 
 interface Props {
   language: Language;
@@ -116,6 +117,18 @@ export const ReminderManager: React.FC<Props> = ({ language, onBack }) => {
   };
 
   const handleTestAlarm = (item: ReminderItem) => {
+    // A real user gesture: the correct moment to request browser-notification
+    // permission (mount-time requests are ignored by browsers).
+    try {
+      if ('Notification' in window && Notification.permission === 'default') {
+        const result = Notification.requestPermission() as unknown;
+        if (result && typeof (result as Promise<unknown>).catch === 'function') {
+          (result as Promise<unknown>).catch(() => undefined);
+        }
+      }
+    } catch {
+      // Notification channel is optional; ringtone + voice still verify sound.
+    }
     setSimulatedActiveAlarm(item);
     audioEngine.startAlarmRingtone(8);
     if (item.voiceAlarm) {
@@ -123,6 +136,17 @@ export const ReminderManager: React.FC<Props> = ({ language, onBack }) => {
         ? `মনত পেলাই দিছোঁ: ${item.title} কৰাৰ সময় হৈছে।`
         : `Reminder alarm: Time for ${item.title}.`;
       audioEngine.speakPrompt(prompt, language);
+    }
+    // Verify the browser-notification channel end-to-end as well.
+    try {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(item.title, {
+          body: item.note || item.title,
+          tag: `test-${item.id}`,
+        });
+      }
+    } catch {
+      // Notification channel is optional.
     }
   };
 
@@ -161,6 +185,19 @@ export const ReminderManager: React.FC<Props> = ({ language, onBack }) => {
             <ArrowLeft size={24} />
             <span>{t.backToHome}</span>
           </button>
+          <div style={{
+            width: '52px',
+            height: '52px',
+            borderRadius: '50%',
+            background: 'var(--emerald-surface)',
+            border: '2px solid var(--emerald-border)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}>
+            <PatientAvatar config={db.getAvatar()} size={42} />
+          </div>
           <div>
             <h1 style={{ fontSize: '26px', fontWeight: 800, color: 'var(--primary-emerald)' }}>
               {t.remindersTitle}
@@ -184,7 +221,7 @@ export const ReminderManager: React.FC<Props> = ({ language, onBack }) => {
       {/* Simulated Active Alarm Banner */}
       {simulatedActiveAlarm && (
         <div style={{
-          background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+          background: '#dc2626',
           color: 'white',
           padding: '24px 32px',
           borderRadius: '24px',
@@ -300,7 +337,7 @@ export const ReminderManager: React.FC<Props> = ({ language, onBack }) => {
               </div>
 
               {/* Actions */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div className="rm-card-actions" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 {/* Test Voice Alarm Sound */}
                 <button
                   className="btn-routine-action"
@@ -373,7 +410,7 @@ export const ReminderManager: React.FC<Props> = ({ language, onBack }) => {
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div className="form-grid-2col" style={{ display: 'grid', gap: '12px' }}>
                 <div>
                   <label style={{ fontSize: '13px', fontWeight: 700, color: '#334155' }}>{t.reminderTimeLabel}</label>
                   <input

@@ -30,6 +30,7 @@ export const DisplaySettingsModal: React.FC<Props> = ({
   ];
 
   const fontScales: { id: FontScale; label: string }[] = [
+    { id: 'small', label: t.fontSizeSmall },
     { id: 'normal', label: t.fontScaleNormal },
     { id: 'large', label: t.fontScaleLarge },
     { id: 'xlarge', label: t.fontScaleXLarge },
@@ -107,7 +108,7 @@ export const DisplaySettingsModal: React.FC<Props> = ({
             <Type size={18} />
             <span>{t.fontScaleTitle}</span>
           </label>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '12px' }}>
             {fontScales.map((fs) => {
               const active = settings.fontScale === fs.id;
               return (
@@ -123,7 +124,7 @@ export const DisplaySettingsModal: React.FC<Props> = ({
                     textAlign: 'center',
                     cursor: 'pointer',
                     fontWeight: 800,
-                    fontSize: fs.id === 'xlarge' ? '16px' : fs.id === 'large' ? '14px' : '13px',
+                    fontSize: fs.id === 'xlarge' ? '16px' : fs.id === 'large' ? '14px' : fs.id === 'small' ? '12px' : '13px',
                     boxShadow: active ? 'var(--shadow-sm)' : 'none',
                     transition: 'all 0.15s ease',
                   }}

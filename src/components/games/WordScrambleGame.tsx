@@ -4,8 +4,22 @@ import { ArrowLeft, CheckCircle2, RotateCcw, Volume2, Sparkles, XCircle } from '
 import type { Language } from '../../types';
 import { translations } from '../../locales/translations';
 import { db } from '../../services/db';
+import { PatientAvatar } from '../common/PatientAvatar';
 import { audioEngine } from '../../services/audioEngine';
+import { gameVoiceBridge } from '../../services/gameVoiceBridge';
 import { adaptiveEngine } from '../../services/adaptiveEngine';
+import { useCoins } from '../../hooks/useCoins';
+import { CoinFlash, CoinPill, CoinSummaryCard } from '../common/CoinReward';
+
+const GAME_TITLES: Record<string, { en: string; as: string }> = {
+  smriti_rong: { en: 'Photo Memory & Recall', as: 'স্মৃতি ৰং (Photo Memory)' },
+  memory_matrix: { en: 'Memory Matrix', as: 'স্মৃতি মেট্ৰিক্স (Memory Matrix)' },
+  taal_xur: { en: 'Taal & Reaction Speed', as: 'তাল আৰু সঁহাৰি (Taal & Reaction)' },
+  muga_motif: { en: 'Pattern & Sequence', as: 'ক্ৰম আৰু চানেকি (Pattern & Sequence)' },
+  word_scramble: { en: 'Word Scramble & Recall', as: 'শব্দ সাঁথৰ (Word Scramble)' },
+  math_maze: { en: 'Math Maze & Logic', as: 'গণিত গোলকধাঁধা (Math Maze)' },
+  bamboo_basket: { en: 'Bamboo Basket Builder', as: 'বাঁহ টোকৰি বুনোৱা (Bamboo Basket Builder)' },
+};
 
 interface Props {
   language: Language;
@@ -60,10 +74,41 @@ export const WordScrambleGame: React.FC<Props> = ({ language, onBack }) => {
   const [selectedLetters, setSelectedLetters] = useState<{ id: number; char: string }[]>([]);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const [score, setScore] = useState(0);
+  const [questionsAnswered, setQuestionsAnswered] = useState(0);
+  const [correctAnswers, setCorrectAnswers] = useState(0);
   const [adaptiveParams, setAdaptiveParams] = useState(() => adaptiveEngine.calculateAdaptiveParameters('word_scramble'));
+  const coins = useCoins('word_scramble');
 
   const startTimeRef = useRef<number>(Date.now());
   const currentPuzzle = puzzleList[puzzleIndex % puzzleList.length];
+
+  const handleBackWithActivity = () => {
+    if (questionsAnswered > 0) {
+      const latency = Date.now() - startTimeRef.current;
+      const accuracy = correctAnswers / questionsAnswered;
+      const profile = db.getPatientProfile();
+      const gameTitle = GAME_TITLES.word_scramble[language as keyof typeof GAME_TITLES.word_scramble] || GAME_TITLES.word_scramble.en;
+      db.recordActivity({
+        timestamp: Date.now(),
+        gameType: 'word_scramble',
+        gameTitle,
+        difficultyLevel: adaptiveParams.currentLevel,
+        score,
+        maxPossibleScore: questionsAnswered * 15,
+        durationMs: latency,
+        mistakesCount: questionsAnswered - correctAnswers,
+        accuracy,
+        completedSuccessfully: accuracy >= 0.5,
+        patientId: profile.id,
+        patientName: profile.name,
+        coinsEarned: coins.getSessionCoins(),
+        correctAnswers,
+        wrongAnswers: questionsAnswered - correctAnswers,
+      });
+    }
+    coins.commit();
+    onBack();
+  };
 
   useEffect(() => {
     startTimeRef.current = Date.now();
@@ -101,6 +146,11 @@ export const WordScrambleGame: React.FC<Props> = ({ language, onBack }) => {
       const correct = spelled === currentPuzzle.word;
 
       setIsCorrect(correct);
+      setQuestionsAnswered(prev => prev + 1);
+      if (correct) {
+        setCorrectAnswers(prev => prev + 1);
+      }
+      coins.recordAnswer(correct);
 
       if (correct) {
         setScore(s => s + 15);
@@ -143,11 +193,32 @@ export const WordScrambleGame: React.FC<Props> = ({ language, onBack }) => {
     setPuzzleIndex(i => i + 1);
   };
 
+  useEffect(() => {
+    gameVoiceBridge.register('word_scramble', {
+      start: () => {
+        setPuzzleIndex(0);
+      },
+      next: handleNext,
+      repeat: handlePlayClueAudio,
+      stop: handleBackWithActivity,
+      readScore: () => {
+        const pts = score;
+        audioEngine.speakPrompt(
+          language === 'as' ? `আপোনাৰ স্কোৰ ${pts}` : `Your score is ${pts}`,
+          language
+        );
+      },
+    });
+    return () => gameVoiceBridge.unregister('word_scramble');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [score, language, onBack]);
+
   return (
     <div className="game-arena-container">
+      {coins.flash && <CoinFlash key={coins.flash.id} amount={coins.flash.amount} />}
       {/* Header */}
       <div className="game-arena-header">
-        <button className="btn-back-kiosk" onClick={onBack}>
+        <button className="btn-back-kiosk" onClick={handleBackWithActivity}>
           <ArrowLeft size={24} />
           <span>{t.backToHome}</span>
         </button>
@@ -159,6 +230,11 @@ export const WordScrambleGame: React.FC<Props> = ({ language, onBack }) => {
           <div className="status-pill">
             <span>{t.score}: {score}</span>
           </div>
+          <CoinPill sessionCoins={coins.sessionCoins} label={t.coinsLabel} />
+        </div>
+
+        <div title={t.avatarEdit} style={{ width: '52px', height: '52px', borderRadius: '50%', background: 'var(--emerald-surface)', border: '2px solid var(--emerald-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <PatientAvatar config={db.getAvatar()} size={42} />
         </div>
       </div>
 
@@ -214,7 +290,7 @@ export const WordScrambleGame: React.FC<Props> = ({ language, onBack }) => {
         </div>
 
         {/* Selected Letters Answer Slots */}
-        <div style={{
+        <div className="word-slots-row" style={{
           display: 'flex',
           gap: '12px',
           minHeight: '80px',
@@ -254,7 +330,7 @@ export const WordScrambleGame: React.FC<Props> = ({ language, onBack }) => {
         </div>
 
         {/* Scrambled Letter Choice Buttons */}
-        <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', justifyContent: 'center', maxWidth: '520px' }}>
+        <div className="word-letters-row" style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', justifyContent: 'center', maxWidth: '520px' }}>
           {scrambledLetters.map((l) => (
             <button
               key={l.id}
@@ -265,7 +341,7 @@ export const WordScrambleGame: React.FC<Props> = ({ language, onBack }) => {
                 height: '68px',
                 borderRadius: '18px',
                 border: l.used ? '2px solid #e2e8f0' : '3px solid #0284c7',
-                background: l.used ? '#f1f5f9' : 'linear-gradient(135deg, #ffffff, #eff6ff)',
+                background: l.used ? '#f1f5f9' : '#eff6ff',
                 color: l.used ? '#94a3b8' : '#0369a1',
                 fontSize: '28px',
                 fontWeight: 900,
@@ -324,6 +400,18 @@ export const WordScrambleGame: React.FC<Props> = ({ language, onBack }) => {
               </button>
             )}
           </div>
+        )}
+
+        {questionsAnswered > 0 && (
+          <CoinSummaryCard
+            labels={t}
+            score={score}
+            maxScore={questionsAnswered * 15}
+            accuracy={correctAnswers / questionsAnswered}
+            coinsEarned={coins.sessionCoins}
+            todayCoins={coins.summary.today + coins.sessionCoins}
+            totalCoins={coins.summary.total + coins.sessionCoins}
+          />
         )}
       </div>
     </div>

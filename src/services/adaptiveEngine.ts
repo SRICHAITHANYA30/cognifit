@@ -14,6 +14,10 @@ export interface AdaptiveProfile {
 class AdaptiveEngine {
   private rollingWindowSize: number = 6;
   private recentTelemetry: TelemetryRecord[] = [];
+  // Master switch for adaptive difficulty (persisted per user, applied from
+  // Settings). When off, games keep the safe default profile and the rolling
+  // window is left untouched so nothing adapts behind the scenes.
+  private adaptiveEnabled: boolean = true;
 
   // Default baseline configuration
   private baselineLatencyMs: number = 2200; // Expected baseline for early-moderate dementia patient
@@ -22,8 +26,40 @@ class AdaptiveEngine {
     this.baselineLatencyMs = Math.max(800, latencyMs);
   }
 
+  public setAdaptiveEnabled(enabled: boolean): void {
+    this.adaptiveEnabled = enabled;
+  }
+
+  public isAdaptiveEnabled(): boolean {
+    return this.adaptiveEnabled;
+  }
+
+  // Clears the in-memory adaptation window (used by "Reset Adaptive
+  // Difficulty"). Stored telemetry history is kept; the next calculation
+  // simply falls back to the safe default profile.
+  public resetAdaptiveState(): void {
+    this.recentTelemetry = [];
+  }
+
+  // Safe default profile for elderly patients (Level 2 baseline).
+  private defaultProfile(): AdaptiveProfile {
+    return {
+      currentLevel: 2,
+      recommendedGridSize: 2,
+      hintPersistenceSeconds: 7,
+      rhythmToleranceMs: 140,
+      touchTargetSizePx: 64,
+      consecutiveSuccessStreak: 0,
+      consecutiveErrorStreak: 0,
+      triggerVoiceAssistance: false,
+    };
+  }
+
   // Record a trial and update difficulty model
   public processTelemetry(record: TelemetryRecord): AdaptiveProfile {
+    if (!this.adaptiveEnabled) {
+      return this.defaultProfile();
+    }
     this.recentTelemetry.push(record);
     if (this.recentTelemetry.length > this.rollingWindowSize) {
       this.recentTelemetry.shift();
@@ -38,16 +74,7 @@ class AdaptiveEngine {
     
     // Default safe level for elderly patients (Level 2)
     if (relevant.length === 0) {
-      return {
-        currentLevel: 2,
-        recommendedGridSize: 2,
-        hintPersistenceSeconds: 7,
-        rhythmToleranceMs: 140,
-        touchTargetSizePx: 64,
-        consecutiveSuccessStreak: 0,
-        consecutiveErrorStreak: 0,
-        triggerVoiceAssistance: false,
-      };
+      return this.defaultProfile();
     }
 
     const last = relevant[relevant.length - 1];
